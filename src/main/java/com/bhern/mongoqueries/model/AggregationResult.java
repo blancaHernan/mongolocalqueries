@@ -1,6 +1,5 @@
 package com.bhern.mongoqueries.model;
 
-import java.util.ArrayList;
 
 public class AggregationResult {
 	private Long adId;
