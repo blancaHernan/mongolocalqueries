@@ -1,17 +1,20 @@
 package com.bhern.mongoqueries.model;
 
+import java.util.ArrayList;
+import java.util.List;
 
 public class AggregationResult {
-	private Long adId;
-	private Object source;
-	public AggregationResult(Long adId, Object source) {
+	private long adId;
+	private List<String> source;
+	public AggregationResult(long adId, List<String> sources) {
+		super();
 		this.adId = adId;
-		this.source = source;
+		this.source = sources;
 	}
-	public Long getAdId() {
+	public long getAdId() {
 		return adId;
 	}
-	public Object getSource() {
+	public List<String> getSource() {
 		return source;
 	}
 	
