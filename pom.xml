@@ -34,6 +34,14 @@
 			<version>2.11.0</version>
 		</dependency>
 		
+		<!-- Apache POI - excel -->
+		<dependency>
+			<groupId>org.apache.poi</groupId>
+			<artifactId>poi</artifactId>
+			<version>3.13</version>
+		</dependency>
+				
+		
 		<!-- Spring data mongodb -->
 		<dependency>
 			<groupId>org.springframework.data</groupId>
