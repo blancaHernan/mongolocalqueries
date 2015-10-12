@@ -33,8 +33,11 @@ import org.springframework.data.mongodb.core.MongoOperations;
 import org.springframework.data.mongodb.core.aggregation.Aggregation;
 import org.springframework.data.mongodb.core.aggregation.AggregationResults;
 import org.springframework.data.mongodb.core.query.Criteria;
+import org.springframework.util.StopWatch;
 
 import com.bhern.mongoqueries.model.AggregationResult;
+import com.bhern.mongoqueries.model.MainCateogry;
+import com.bhern.mongoqueries.model.PriceRange;
 import  com.mongodb.BasicDBList;
 import com.mongodb.DBObject;
 
@@ -48,47 +51,69 @@ public class App
     	ApplicationContext ctx = new GenericXmlApplicationContext("application-context.xml");
     	   MongoOperations mongoOperation = (MongoOperations)ctx.getBean("mongoTemplate");
     	
-    	
+    	StopWatch stopwatch = new StopWatch();
+    	stopwatch.start();
+    	List<MainCateogry> categories = DataInitializer.init();   	   
 	   	System.out.print("Loaded!!");
-	   	Criteria criteria = new Criteria().andOperator
-	   			(Criteria.where("mainCategory.valueId").is(76), 
-	   		     Criteria.where("price").lt(9)
+	   	for(MainCateogry cat : categories){
+	        HSSFWorkbook workbook = new HSSFWorkbook();
+	   		for(PriceRange price : cat.getPriceRange()){
+	   			try{
+				   	Criteria criteria = getCriteria(cat.getValueId(), price.getMinPrice(), price.getMaxPrice());
+				   	Aggregation sourceAggregation = getAggregation(criteria, "source");	   	
+				   	Aggregation inspectionDateAggregation = getAggregation(criteria, "inspectionDate");	   
+				   	
+				   	AggregationResults<DBObject> sourceResults = mongoOperation.aggregate(sourceAggregation, "fcsAdMarketPlace", DBObject.class);
+				   	AggregationResults<DBObject> inspectionDateResults = mongoOperation.aggregate(inspectionDateAggregation, "fcsAdMarketPlace", DBObject.class);
+				   	
+				   	List<AggregationResult> aggRes = mapResults(sourceResults.getMappedResults(), inspectionDateResults.getMappedResults());
+				   	writeExcel(aggRes, cat.getName(), price, workbook );
+	   			} catch(Exception e){
+	   				System.out.print("There where some errors with the cat " + cat.getName() +
+	   						" and price " + price.getMinPrice());
+	   				System.out.println(e);
+	   			}
+	   		}
+	   	}
+	   	stopwatch.stop();
+	   	System.out.println("Duration: " + stopwatch.getLastTaskTimeMillis());
+    }
+    
+    private static Criteria getCriteria(int valueId, int minPrice, int maxPrice){
+    	Criteria criteria = new Criteria().andOperator
+	   			(Criteria.where("mainCategory.valueId").is(valueId), 
+	   		     Criteria.where("price").lt(maxPrice), 
+	   		     Criteria.where("price").gt(minPrice)
 	   					);
-	   	Aggregation sourceAggregation = newAggregation( 
-	   			match(criteria), 
-	   			limit(100),
-	   			group("adId").push("source").as("source"),
-	   			project("source")
-		);
-	   	
-	   	Aggregation inspectionDateAggregation = newAggregation( 
-	   			match(criteria), 
-	   			limit(100),
-	   			group("adId").push("inspectionDate").as("inspectionDate"),
+    	return criteria;
+    }
+    
+    private static Aggregation getAggregation(Criteria matchCriteria, String pushFiled){
+    	return newAggregation( 
+	   			match(matchCriteria), 
+	   			//limit(100),
+	   			group("adId", "inspectionDate").push(pushFiled).as(pushFiled),
 	   			sort(Direction.DESC, "inspectionDate"),
-	   			project("inspectionDate")
+	   			project(pushFiled)
 		);
-	   	
-	   	AggregationResults<DBObject> sourceResults = mongoOperation.aggregate(sourceAggregation, "fcsAdMarketPlace", DBObject.class);
-	   	AggregationResults<DBObject> inspectionDateResults = mongoOperation.aggregate(inspectionDateAggregation, "fcsAdMarketPlace", DBObject.class);
-	   	
-	   	List<DBObject> sourceFieldList = sourceResults.getMappedResults();
-	   	List<DBObject> inspectionDateFieldList = inspectionDateResults.getMappedResults();
-	   	List<AggregationResult> aggRes = new ArrayList();
+    }
+    
+    private static List<AggregationResult> mapResults(List<DBObject> sourceFieldList, List<DBObject> inspectionDateFieldList){
+    	List<AggregationResult> aggRes = new ArrayList();
         if(sourceFieldList != null && !sourceFieldList.isEmpty()) {
         	Long adId = null;
-        	List<String> sources = new ArrayList();
         	List<Date> inspectionDates = new ArrayList();
         	HashMap<Long, List<String>> map = new HashMap();
             for(DBObject db: sourceFieldList){
-            	adId = Long.valueOf(db.get("_id").toString());
+            	adId = Long.valueOf(db.get("adId").toString());
+            	List<String> sources = new ArrayList();
             	for(Object source : ((BasicDBList)db.get("source"))){
             		sources.add((String) source);
             	}
             	map.put(adId, sources);
             }
             for(DBObject db: inspectionDateFieldList){
-            	adId = Long.valueOf(db.get("_id").toString());
+            	adId = Long.valueOf(db.get("adId").toString());
             	for(Object inspectionDate : ((BasicDBList)db.get("inspectionDate"))){
             		inspectionDates.add((Date)inspectionDate);
             	}
@@ -96,10 +121,12 @@ public class App
             	aggRes.add(new AggregationResult(adId, map.get(adId), inspectionDates));
             }
         }
-        
+        return aggRes;
+    }
+    
+    private static void writeExcel(List<AggregationResult> aggRes, String sheetName, PriceRange price, HSSFWorkbook workbook){
         //Write the results in a excel list
-        HSSFWorkbook workbook = new HSSFWorkbook();
-        HSSFSheet sheet = workbook.createSheet("Sample sheet");
+        HSSFSheet sheet = workbook.createSheet(price.getMinPrice() + " - " + price.getMaxPrice());
         CreationHelper createHelper = workbook.getCreationHelper();
         
 
@@ -108,7 +135,7 @@ public class App
         Cell cell = row.createCell(0);
         cell.setCellValue("AdId");
         cell = row.createCell(1);
-        cell.setCellValue("Number of sources");
+        cell.setCellValue("Number of versions");
         cell = row.createCell(2);
         cell.setCellValue("First source");
         cell = row.createCell(3);
@@ -123,16 +150,17 @@ public class App
             cell = row.createCell(cellnum++);
             cell.setCellValue(res.getAdId());
             cell = row.createCell(cellnum++);
-            cell.setCellValue(res.getSource().size());
-            //TODO: first and last source
+            cell.setCellValue(res.getInspectionDate().size());
             cell = row.createCell(cellnum++);
+            cell.setCellValue(res.getSource().get(0));
             cell = row.createCell(cellnum++);
+            cell.setCellValue(res.getSource().get(res.getSource().size() - 1));
 
             CellStyle cellStyle = workbook.createCellStyle();
             cellStyle.setDataFormat(
                 createHelper.createDataFormat().getFormat("yyyy-MM-dd'T'HH:mm:ss.SSSz")); //2014-06-30T00:01:43.289Z           
             cell = row.createCell(cellnum++);
-            cell.setCellValue(res.getInspectionDate().get(0));
+            cell.setCellValue(res.getInspectionDate().	get(0));
             cell.setCellStyle(cellStyle);
             cell = row.createCell(cellnum++);
             cell.setCellValue(res.getInspectionDate().get(res.getInspectionDate().size() - 1));
@@ -142,7 +170,7 @@ public class App
          
         try {
             FileOutputStream out = 
-                    new FileOutputStream(new File("C:\\Users\\blancaHN\\Desktop\\WI\\Master arbeit\\excels\\test.xls"));
+                    new FileOutputStream(new File("C:\\Users\\blancaHN\\Desktop\\WI\\Master arbeit\\excels\\" + sheetName + ".xls"));
             workbook.write(out);
             out.close();
             System.out.println("Excel written successfully..");
@@ -151,6 +179,6 @@ public class App
             e.printStackTrace();
         } catch (IOException e) {
             e.printStackTrace();
-        }
+        } 
     }
 }
