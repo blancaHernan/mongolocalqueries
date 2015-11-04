@@ -3,7 +3,7 @@ package com.bhern.mongoqueries;
 import java.util.ArrayList;
 import java.util.List;
 
-import com.bhern.mongoqueries.model.MainCateogry;
+import com.bhern.mongoqueries.model.MainCategory;
 import com.bhern.mongoqueries.model.PriceRange;
 
 public class DataInitializer {
@@ -18,20 +18,21 @@ public class DataInitializer {
 			"Antiquitäten  Sammlungen  Kunst", 
 			"PC-Spiele   Videospiele"};
 	
-	public static List<MainCateogry> init(){
-		List<MainCateogry> categories = new ArrayList();
+	public static List<MainCategory> init(){
+		List<MainCategory> categories = new ArrayList();
 		boolean equalSize = categoryList.length == categoryNameList.length;
 		if(!equalSize){
 			System.out.println("WARNING!! Some errors in the initialiazation!!");
 		}
 		for(int i = 0; i < categoryList.length; i++){
-			categories.add(new MainCateogry(categoryNameList[i], 
+			categories.add(new MainCategory(categoryNameList[i], 
 					categoryList[i], getPrices(categoryList[i])));
 		}
 		return categories;
 	}
 	
 	private static List<PriceRange> getPrices(int attributeId){
+		//TODO: price ranges from Reinhard
 		List<PriceRange> priceRanges = new ArrayList<PriceRange>();
 		switch(attributeId){
 			case 8205:
