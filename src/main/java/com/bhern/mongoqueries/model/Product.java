@@ -12,6 +12,8 @@ public class Product {
 	private String productName;
 	private double price;
 	
+	public Product(){}
+	
 	public Product(long featureId, String productType, String productName, double price) {
 		super();
 		this.featureId = featureId;

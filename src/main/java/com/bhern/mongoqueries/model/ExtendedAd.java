@@ -21,6 +21,7 @@ public class ExtendedAd {
 	private Date lastInspection;
 	private List<Product> productList;
 	private MainCategory mainCategory;
+	private String postalCode;
 	
 	public long getAdId() {
 		return adId;
@@ -62,8 +63,12 @@ public class ExtendedAd {
 		return mainCategory;
 	}
 
+	public String getPostalCode() {
+		return postalCode;
+	}
+
 	public ExtendedAd(long adId, String source, int imagesCount, int textLenght, double price, Date adCreated,
-			Date adPublish, Date lastInspection, List<Product> productList, MainCategory mainCategory) {
+			Date adPublish, Date lastInspection, List<Product> productList, MainCategory mainCategory, String postalCode) {
 		super();
 		this.adId = adId;
 		this.source = source;
@@ -75,6 +80,7 @@ public class ExtendedAd {
 		this.lastInspection = lastInspection;
 		this.productList = productList;
 		this.mainCategory = mainCategory;
+		this.postalCode = postalCode;
 	}
 
 	
