@@ -11,14 +11,11 @@ import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
-import java.text.DateFormat;
 import java.text.ParseException;
-import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
-import java.util.Locale;
 
 import org.apache.poi.hssf.usermodel.HSSFSheet;
 import org.apache.poi.hssf.usermodel.HSSFWorkbook;
@@ -36,13 +33,14 @@ import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.util.StopWatch;
 
 import com.bhern.mongoqueries.model.AggregationResult;
-import com.bhern.mongoqueries.model.MainCateogry;
+import com.bhern.mongoqueries.model.MainCategory;
 import com.bhern.mongoqueries.model.PriceRange;
 import  com.mongodb.BasicDBList;
 import com.mongodb.DBObject;
 
 /**
- * Hello world!
+ * The main app.
+ * Loads the ads from the mongodb and writes in an excel sheet the results aggregated
  *
  */
 public class App 
@@ -53,12 +51,12 @@ public class App
     	
     	StopWatch stopwatch = new StopWatch();
     	stopwatch.start();
-    	List<MainCateogry> categories = DataInitializer.init();   	   
+    	List<MainCategory> categories = DataInitializer.init();   	   
 	   	System.out.print("Loaded!!");
-	   	for(MainCateogry cat : categories){
+	   	for(MainCategory cat : categories){
 	        HSSFWorkbook workbook = new HSSFWorkbook();
 	   		for(PriceRange price : cat.getPriceRange()){
-	   			try{
+	   			//try{
 				   	Criteria criteria = getCriteria(cat.getValueId(), price.getMinPrice(), price.getMaxPrice());
 				   	Aggregation sourceAggregation = getAggregation(criteria, "source");	   	
 				   	Aggregation inspectionDateAggregation = getAggregation(criteria, "inspectionDate");	   
@@ -68,11 +66,11 @@ public class App
 				   	
 				   	List<AggregationResult> aggRes = mapResults(sourceResults.getMappedResults(), inspectionDateResults.getMappedResults());
 				   	writeExcel(aggRes, cat.getName(), price, workbook );
-	   			} catch(Exception e){
+	   			/*} catch(Exception e){
 	   				System.out.print("There where some errors with the cat " + cat.getName() +
 	   						" and price " + price.getMinPrice());
 	   				System.out.println(e);
-	   			}
+	   			}*/
 	   		}
 	   	}
 	   	stopwatch.stop();
@@ -91,10 +89,17 @@ public class App
     private static Aggregation getAggregation(Criteria matchCriteria, String pushFiled){
     	return newAggregation( 
 	   			match(matchCriteria), 
-	   			//limit(100),
-	   			group("adId", "inspectionDate").push(pushFiled).as(pushFiled),
+	   			limit(100),
+	   			group("adId")
+	   				.count().as("count")
+	   				.first("inspectionDate").as("inspectionDate")
+	   				.first("source").as("source")
+	   				.first("text").as("text")
+	   				.first("price").as("price")
+	   				.first("images").as("images")
+	   				.push(pushFiled).as(pushFiled),
 	   			sort(Direction.DESC, "inspectionDate"),
-	   			project(pushFiled)
+	   			project(pushFiled, "text", "count")
 		);
     }
     
@@ -105,7 +110,7 @@ public class App
         	List<Date> inspectionDates = new ArrayList();
         	HashMap<Long, List<String>> map = new HashMap();
             for(DBObject db: sourceFieldList){
-            	adId = Long.valueOf(db.get("adId").toString());
+            	adId = Long.valueOf(db.get("_id").toString());
             	List<String> sources = new ArrayList();
             	for(Object source : ((BasicDBList)db.get("source"))){
             		sources.add((String) source);
@@ -113,12 +118,14 @@ public class App
             	map.put(adId, sources);
             }
             for(DBObject db: inspectionDateFieldList){
-            	adId = Long.valueOf(db.get("adId").toString());
+            	adId = Long.valueOf(db.get("_id").toString());
+            	int count = Integer.valueOf(db.get("count").toString());
+            	int textLength = db.get("text").toString().length();
             	for(Object inspectionDate : ((BasicDBList)db.get("inspectionDate"))){
             		inspectionDates.add((Date)inspectionDate);
             	}
-            	
-            	aggRes.add(new AggregationResult(adId, map.get(adId), inspectionDates));
+            	            	
+            	aggRes.add(new AggregationResult(adId, map.get(adId), inspectionDates, count, 0, textLength, 0));
             }
         }
         return aggRes;
@@ -131,6 +138,9 @@ public class App
         
 
         int rownum = 0;
+        CellStyle cellStyle = workbook.createCellStyle();
+        cellStyle.setDataFormat(
+                createHelper.createDataFormat().getFormat("yyyy-MM-dd'T'HH:mm:ss.SSSz")); 
         Row row = sheet.createRow(rownum++);
         Cell cell = row.createCell(0);
         cell.setCellValue("AdId");
@@ -144,27 +154,27 @@ public class App
         cell.setCellValue("First inspectionDate");
         cell = row.createCell(5);
         cell.setCellValue("Last inspectionDate");
+        cell = row.createCell(6);
+        cell.setCellValue("Text length");
         for(AggregationResult res : aggRes){
             row = sheet.createRow(rownum++);
             int cellnum = 0;
             cell = row.createCell(cellnum++);
             cell.setCellValue(res.getAdId());
             cell = row.createCell(cellnum++);
-            cell.setCellValue(res.getInspectionDate().size());
+            cell.setCellValue(res.getCount());
             cell = row.createCell(cellnum++);
             cell.setCellValue(res.getSource().get(0));
             cell = row.createCell(cellnum++);
-            cell.setCellValue(res.getSource().get(res.getSource().size() - 1));
-
-            CellStyle cellStyle = workbook.createCellStyle();
-            cellStyle.setDataFormat(
-                createHelper.createDataFormat().getFormat("yyyy-MM-dd'T'HH:mm:ss.SSSz")); //2014-06-30T00:01:43.289Z           
+            cell.setCellValue(res.getSource().get(res.getSource().size() - 1));           
             cell = row.createCell(cellnum++);
-            cell.setCellValue(res.getInspectionDate().	get(0));
+            cell.setCellValue(res.getInspectionDate().get(0));
             cell.setCellStyle(cellStyle);
             cell = row.createCell(cellnum++);
             cell.setCellValue(res.getInspectionDate().get(res.getInspectionDate().size() - 1));
             cell.setCellStyle(cellStyle);
+            cell = row.createCell(cellnum++);
+            cell.setCellValue(res.getTextLenght());
         	
         }
          

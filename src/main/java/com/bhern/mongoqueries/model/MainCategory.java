@@ -2,11 +2,11 @@ package com.bhern.mongoqueries.model;
 
 import java.util.List;
 
-public class MainCateogry {
+public class MainCategory {
 	private String name;
 	private int valueId;
 	private List<PriceRange> priceRange;
-	public MainCateogry(String name, int valueId, List<PriceRange> priceRange) {
+	public MainCategory(String name, int valueId, List<PriceRange> priceRange) {
 		super();
 		this.name = name;
 		this.valueId = valueId;
