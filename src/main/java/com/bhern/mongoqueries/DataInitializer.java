@@ -43,12 +43,7 @@ public class DataInitializer {
 	}
 	
 	private static List<PriceRange> getPrices(int attributeId){
-		//TODO: price ranges from Reinhard
 		List<PriceRange> priceRanges = new ArrayList<PriceRange>();
-		priceRanges.add(new PriceRange(0, 1));
-		priceRanges.add(new PriceRange(1, 10));
-		priceRanges.add(new PriceRange(11, 50));
-		priceRanges.add(new PriceRange(51, 80));
 		priceRanges.add(new PriceRange(0, 1));
 		priceRanges.add(new PriceRange(81, 99));
 		priceRanges.add(new PriceRange(100, 200));

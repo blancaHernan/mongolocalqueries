@@ -1,6 +1,7 @@
 package com.bhern.mongoqueries;
 
 import static org.springframework.data.mongodb.core.aggregation.Aggregation.group;
+import static org.springframework.data.mongodb.core.aggregation.Aggregation.limit;
 import static org.springframework.data.mongodb.core.aggregation.Aggregation.match;
 import static org.springframework.data.mongodb.core.aggregation.Aggregation.newAggregation;
 import static org.springframework.data.mongodb.core.aggregation.Aggregation.project;
@@ -32,38 +33,33 @@ import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.util.StopWatch;
 
 import com.bhern.mongoqueries.model.AggregationResult;
-import com.bhern.mongoqueries.model.MainCateogry;
+import com.bhern.mongoqueries.model.ExtendedAd;
+import com.bhern.mongoqueries.model.MainCategory;
 import com.bhern.mongoqueries.model.PriceRange;
+import com.bhern.mongoqueries.model.Product;
 import com.mongodb.BasicDBList;
+import com.mongodb.BasicDBObject;
 import com.mongodb.DBObject;
 
 public class ExtendedDataExporter {
-	public static void main( String[] args ) throws ParseException{
+public static void main( String[] args ) throws ParseException{
     	ApplicationContext ctx = new GenericXmlApplicationContext("application-context.xml");
-    	MongoOperations mongoOperation = (MongoOperations)ctx.getBean("mongoTemplate");
+    	   MongoOperations mongoOperation = (MongoOperations)ctx.getBean("mongoTemplate");
     	
     	StopWatch stopwatch = new StopWatch();
     	stopwatch.start();
-    	List<MainCateogry> categories = DataInitializer.init();   	   
+    	List<MainCategory> categories = DataInitializer.init();   	   
 	   	System.out.print("Loaded!!");
-	   	for(MainCateogry cat : categories){
+	   	for(MainCategory cat : categories){	   		
 	        HSSFWorkbook workbook = new HSSFWorkbook();
 	   		for(PriceRange price : cat.getPriceRange()){
-	   			try{
 				   	Criteria criteria = getCriteria(cat.getValueId(), price.getMinPrice(), price.getMaxPrice());
-				   	Aggregation sourceAggregation = getAggregation(criteria, "source");	   	
-				   	Aggregation inspectionDateAggregation = getAggregation(criteria, "inspectionDate");	   
+				   	Aggregation sourceAggregation = getAggregation(criteria);	   	  
 				   	
-				   	AggregationResults<DBObject> sourceResults = mongoOperation.aggregate(sourceAggregation, "fcsAdMarketPlace", DBObject.class);
-				   	AggregationResults<DBObject> inspectionDateResults = mongoOperation.aggregate(inspectionDateAggregation, "fcsAdMarketPlace", DBObject.class);
+				   	AggregationResults<DBObject> aggregateResults = mongoOperation.aggregate(sourceAggregation, "extendedAd", DBObject.class);
 				   	
-				   	List<AggregationResult> aggRes = mapResults(sourceResults.getMappedResults(), inspectionDateResults.getMappedResults());
+				   	List<ExtendedAd> aggRes = mapResults(aggregateResults.getMappedResults());
 				   	writeExcel(aggRes, cat.getName(), price, workbook );
-	   			} catch(Exception e){
-	   				System.out.print("There where some errors with the cat " + cat.getName() +
-	   						" and price " + price.getMinPrice());
-	   				System.out.println(e);
-	   			}
 	   		}
 	   	}
 	   	stopwatch.stop();
@@ -79,83 +75,118 @@ public class ExtendedDataExporter {
     	return criteria;
     }
     
-    private static Aggregation getAggregation(Criteria matchCriteria, String pushFiled){
+    private static Aggregation getAggregation(Criteria matchCriteria){
     	return newAggregation( 
 	   			match(matchCriteria), 
-	   			//limit(100),
-	   			group("adId", "inspectionDate").push(pushFiled).as(pushFiled),
-	   			sort(Direction.DESC, "inspectionDate"),
-	   			project(pushFiled)
+	   			group("adId")
+	   				.count().as("count")
+	   				.first("source").as("source")
+	   				.first("imagesCount").as("imagesCount")
+	   				.first("price").as("price")
+	   				.first("textLenght").as("textLenght")
+	   				.first("lastInspection").as("lastInspection")
+	   				.first("adCreated").as("adCreated")
+	   				.first("adPublish").as("adPublish")
+	   				.first("mainCategory.valueId").as("mainCategory")
+	   				.first("postalCode").as("postalCode")
+	   				.push("productList").as("productList"),
+	   			sort(Direction.DESC, "lastInspection"),
+	   			project("adId", "imagesCount", "price", "textLenght", "lastInspection", "source", 
+	   					"adCreated", "adPublish", "mainCategory", "postalCode", "productList")
 		);
     }
     
-    private static List<AggregationResult> mapResults(List<DBObject> sourceFieldList, List<DBObject> inspectionDateFieldList){
-    	List<AggregationResult> aggRes = new ArrayList();
-        if(sourceFieldList != null && !sourceFieldList.isEmpty()) {
+    private static List<ExtendedAd> mapResults(List<DBObject> fieldList){
+    	List<ExtendedAd> aggRes = new ArrayList();
+        if(fieldList != null && !fieldList.isEmpty()) {
         	Long adId = null;
         	List<Date> inspectionDates = new ArrayList();
         	HashMap<Long, List<String>> map = new HashMap();
-            for(DBObject db: sourceFieldList){
-            	adId = Long.valueOf(db.get("adId").toString());
-            	List<String> sources = new ArrayList();
-            	for(Object source : ((BasicDBList)db.get("source"))){
-            		sources.add((String) source);
+            for(DBObject db: fieldList){
+            	String source = db.get("source").toString();
+            	Integer imagesCount = Integer.valueOf(db.get("imagesCount").toString());
+            	Date lastInspection = ((Date)db.get("lastInspection"));
+            	Date adCreated = ((Date)db.get("adCreated"));
+            	Date adPublish = ((Date)db.get("adPublish"));
+            	Integer textLength = db.get("textLenght") == null ? 0:Integer.valueOf(db.get("textLenght").toString());
+            	Integer mainCategory = Integer.valueOf(db.get("mainCategory").toString());
+            	String postalCode = db.get("postalCode").toString();
+            	Double price = Double.valueOf(db.get("price").toString());
+            	adId = Long.valueOf(db.get("_id").toString());
+            	List<Product> products = new ArrayList();
+            	for(Object productList : (BasicDBList)db.get("productList")){
+            		for(Object product : (BasicDBList)productList){
+            			Long featureId = ((BasicDBObject)product).get("featureId") == null ? 0:Long.valueOf(((BasicDBObject)product).get("featureId").toString());
+            			String productType = ((BasicDBObject)product).get("productType") == null ? "":((BasicDBObject)product).get("productType").toString();
+            			String productName = ((BasicDBObject)product).get("productName") == null ? "":((BasicDBObject)product).get("productName").toString();
+                    	Double productPrice = ((BasicDBObject)product).get("price") == null ? 0:Double.valueOf(((BasicDBObject)product).get("price").toString());
+            			products.add(new Product(featureId, productType, productName, productPrice));
+            		}
             	}
-            	map.put(adId, sources);
+            	aggRes.add(new ExtendedAd(adId, source, imagesCount, textLength, price, adCreated, adPublish,
+            			lastInspection, products, null, postalCode));
             }
-            for(DBObject db: inspectionDateFieldList){
-            	adId = Long.valueOf(db.get("adId").toString());
-            	for(Object inspectionDate : ((BasicDBList)db.get("inspectionDate"))){
-            		inspectionDates.add((Date)inspectionDate);
-            	}
-            	
-            	aggRes.add(new AggregationResult(adId, map.get(adId), inspectionDates));
-            }
+            
         }
         return aggRes;
     }
     
-    private static void writeExcel(List<AggregationResult> aggRes, String sheetName, PriceRange price, HSSFWorkbook workbook){
+    private static void writeExcel(List<ExtendedAd> aggRes, String sheetName, PriceRange price, HSSFWorkbook workbook){
         //Write the results in a excel list
         HSSFSheet sheet = workbook.createSheet(price.getMinPrice() + " - " + price.getMaxPrice());
         CreationHelper createHelper = workbook.getCreationHelper();
         
 
         int rownum = 0;
+        CellStyle cellStyle = workbook.createCellStyle();
+        cellStyle.setDataFormat(
+                createHelper.createDataFormat().getFormat("yyyy-MM-dd'T'HH:mm:ss.SSSz")); 
         Row row = sheet.createRow(rownum++);
         Cell cell = row.createCell(0);
         cell.setCellValue("AdId");
         cell = row.createCell(1);
-        cell.setCellValue("Number of versions");
+        cell.setCellValue("Source");
         cell = row.createCell(2);
-        cell.setCellValue("First source");
+        cell.setCellValue("Number of images");
         cell = row.createCell(3);
-        cell.setCellValue("Last source");
+        cell.setCellValue("Text length");
         cell = row.createCell(4);
-        cell.setCellValue("First inspectionDate");
+        cell.setCellValue("Price");
         cell = row.createCell(5);
-        cell.setCellValue("Last inspectionDate");
-        for(AggregationResult res : aggRes){
+        cell.setCellValue("Ad created date");
+        cell = row.createCell(6);
+        cell.setCellValue("Ad publish date");
+        cell = row.createCell(7);
+        cell.setCellValue("Last inspection date");
+        cell = row.createCell(8);
+        cell.setCellValue("Product list");
+        cell = row.createCell(9);
+        cell.setCellValue("Postal code");
+        for(ExtendedAd res : aggRes){
             row = sheet.createRow(rownum++);
             int cellnum = 0;
             cell = row.createCell(cellnum++);
             cell.setCellValue(res.getAdId());
             cell = row.createCell(cellnum++);
-            cell.setCellValue(res.getInspectionDate().size());
+            cell.setCellValue(res.getSource());
             cell = row.createCell(cellnum++);
-            cell.setCellValue(res.getSource().get(0));
+            cell.setCellValue(res.getImagesCount());
             cell = row.createCell(cellnum++);
-            cell.setCellValue(res.getSource().get(res.getSource().size() - 1));
-
-            CellStyle cellStyle = workbook.createCellStyle();
-            cellStyle.setDataFormat(
-                createHelper.createDataFormat().getFormat("yyyy-MM-dd'T'HH:mm:ss.SSSz")); //2014-06-30T00:01:43.289Z           
+            cell.setCellValue(res.getTextLenght());           
             cell = row.createCell(cellnum++);
-            cell.setCellValue(res.getInspectionDate().	get(0));
+            cell.setCellValue(res.getPrice());
+            cell = row.createCell(cellnum++);
+            cell.setCellValue(res.getAdCreated());
             cell.setCellStyle(cellStyle);
             cell = row.createCell(cellnum++);
-            cell.setCellValue(res.getInspectionDate().get(res.getInspectionDate().size() - 1));
+            cell.setCellValue(res.getAdPublish());
             cell.setCellStyle(cellStyle);
+            cell = row.createCell(cellnum++);
+            cell.setCellValue(res.getLastInspection());
+            cell.setCellStyle(cellStyle);
+            cell = row.createCell(cellnum++);
+            cell = row.createCell(cellnum++);
+            cell.setCellValue(res.getPostalCode());
         	
         }
          
