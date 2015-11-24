@@ -1,7 +1,6 @@
 package com.bhern.mongoqueries;
 
 import static org.springframework.data.mongodb.core.aggregation.Aggregation.group;
-import static org.springframework.data.mongodb.core.aggregation.Aggregation.limit;
 import static org.springframework.data.mongodb.core.aggregation.Aggregation.match;
 import static org.springframework.data.mongodb.core.aggregation.Aggregation.newAggregation;
 import static org.springframework.data.mongodb.core.aggregation.Aggregation.project;
@@ -32,7 +31,6 @@ import org.springframework.data.mongodb.core.aggregation.AggregationResults;
 import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.util.StopWatch;
 
-import com.bhern.mongoqueries.model.AggregationResult;
 import com.bhern.mongoqueries.model.ExtendedAd;
 import com.bhern.mongoqueries.model.MainCategory;
 import com.bhern.mongoqueries.model.PriceRange;
@@ -44,7 +42,7 @@ import com.mongodb.DBObject;
 public class ExtendedDataExporter {
 public static void main( String[] args ) throws ParseException{
     	ApplicationContext ctx = new GenericXmlApplicationContext("application-context.xml");
-    	   MongoOperations mongoOperation = (MongoOperations)ctx.getBean("mongoTemplate");
+    	MongoOperations mongoOperation = (MongoOperations)ctx.getBean("mongoTemplate");
     	
     	StopWatch stopwatch = new StopWatch();
     	stopwatch.start();
