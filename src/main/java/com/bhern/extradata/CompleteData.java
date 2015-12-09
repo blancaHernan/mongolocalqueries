@@ -8,6 +8,7 @@ import java.io.IOException;
 import java.text.DateFormat;
 import java.text.ParseException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.Locale;
@@ -40,7 +41,7 @@ public class CompleteData {
 
 	public static void main(String[] args) throws IOException{
  	   	//Read all the documents
-		for(int i = 5; i<=9; i++){
+		for(int i = 2; i<=9; i++){
 			FileInputStream inputStream = null;
 			Scanner sc = null;
 			String path = "C:\\Users\\blancaHN\\Desktop\\WI\\Master arbeit\\Nihal Data\\2015 0" + i + ".skv";
@@ -94,7 +95,7 @@ public class CompleteData {
 			        			DateFormatter dateFormat = new DateFormatter("dd.MM.yyyy HH:mm:ss");
 			        			Date adCreatedDate = dateFormat.parse(fields[3], Locale.GERMAN);
 								Date adPublishedDate = dateFormat.parse(fields[4], Locale.GERMAN);
-			        			extendedAd = new ExtendedAd(Long.valueOf(adId), 
+			        			extendedAd = new ExtendedAd((Long)ad.get("orgId"), Long.valueOf(adId), 
 			        					(String)ad.get("source"), 
 			        					((org.bson.types.BasicBSONList)ad.get("images")).size(),
 			        					((String)ad.get("text")).length(),
@@ -122,6 +123,9 @@ public class CompleteData {
 	    		System.out.println("Exception for the line " + line + " " + e);
 	    	}
 	    } 
+	    mongoOperation.insertAll(map.values());
+	    System.out.println("Last --> Elements: " + map.size());
+		map.clear();
 	    return map;
 	}
 	
@@ -129,10 +133,12 @@ public class CompleteData {
 		//Fill product
     	Product product = new Product();
     	try{
-    		product = new Product(Long.valueOf(fields[6]), fields[7], 
-    			fields[8], Double.valueOf(fields[9].replace(",", ".")));
+    		if(fields.length > 9){
+	    		product = new Product(Long.valueOf(fields[6]), fields[7], 
+	    			fields[8], Double.valueOf(fields[9].replace(",", ".")));
+    		}
     	}catch(Exception e){
-    		//Do nothing, but the ad should be added to the DB wothout product
+    		System.out.println("Problem parsing " + Arrays.toString(fields) + e);
     	}
     	return product;
 	}

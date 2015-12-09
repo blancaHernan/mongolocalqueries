@@ -39,6 +39,8 @@ import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
 import com.mongodb.DBObject;
 
+import utils.ListUtils;
+
 public class ExtendedDataExporter {
 public static void main( String[] args ) throws ParseException{
     	ApplicationContext ctx = new GenericXmlApplicationContext("application-context.xml");
@@ -87,10 +89,11 @@ public static void main( String[] args ) throws ParseException{
 	   				.first("adPublish").as("adPublish")
 	   				.first("mainCategory.valueId").as("mainCategory")
 	   				.first("postalCode").as("postalCode")
+	   				.first("orgId").as("orgId")
 	   				.push("productList").as("productList"),
 	   			sort(Direction.DESC, "lastInspection"),
 	   			project("adId", "imagesCount", "price", "textLenght", "lastInspection", "source", 
-	   					"adCreated", "adPublish", "mainCategory", "postalCode", "productList")
+	   					"adCreated", "adPublish", "mainCategory", "postalCode", "productList", "orgId")
 		);
     }
     
@@ -110,6 +113,7 @@ public static void main( String[] args ) throws ParseException{
             	Integer mainCategory = Integer.valueOf(db.get("mainCategory").toString());
             	String postalCode = db.get("postalCode").toString();
             	Double price = Double.valueOf(db.get("price").toString());
+            	Long orgId = Long.valueOf(db.get("orgId").toString());
             	adId = Long.valueOf(db.get("_id").toString());
             	List<Product> products = new ArrayList();
             	for(Object productList : (BasicDBList)db.get("productList")){
@@ -121,7 +125,7 @@ public static void main( String[] args ) throws ParseException{
             			products.add(new Product(featureId, productType, productName, productPrice));
             		}
             	}
-            	aggRes.add(new ExtendedAd(adId, source, imagesCount, textLength, price, adCreated, adPublish,
+            	aggRes.add(new ExtendedAd(orgId, adId, source, imagesCount, textLength, price, adCreated, adPublish,
             			lastInspection, products, null, postalCode));
             }
             
@@ -131,7 +135,8 @@ public static void main( String[] args ) throws ParseException{
     
     private static void writeExcel(List<ExtendedAd> aggRes, String sheetName, PriceRange price, HSSFWorkbook workbook){
         //Write the results in a excel list
-        HSSFSheet sheet = workbook.createSheet(price.getMinPrice() + " - " + price.getMaxPrice());
+        String priceRangeName = price.getMinPrice() + " - " + price.getMaxPrice();
+		HSSFSheet sheet = workbook.createSheet(priceRangeName);
         CreationHelper createHelper = workbook.getCreationHelper();
         
 
@@ -141,25 +146,31 @@ public static void main( String[] args ) throws ParseException{
                 createHelper.createDataFormat().getFormat("yyyy-MM-dd'T'HH:mm:ss.SSSz")); 
         Row row = sheet.createRow(rownum++);
         Cell cell = row.createCell(0);
-        cell.setCellValue("AdId");
+        cell.setCellValue("AdId_" + priceRangeName);
         cell = row.createCell(1);
-        cell.setCellValue("Source");
+        cell.setCellValue("Source_" + priceRangeName);
         cell = row.createCell(2);
-        cell.setCellValue("Number of images");
+        cell.setCellValue("NumberImages_" + priceRangeName);
         cell = row.createCell(3);
-        cell.setCellValue("Text length");
+        cell.setCellValue("TextLength_" + priceRangeName);
         cell = row.createCell(4);
-        cell.setCellValue("Price");
+        cell.setCellValue("Price_" + priceRangeName);
         cell = row.createCell(5);
-        cell.setCellValue("Ad created date");
+        cell.setCellValue("AdCreatedDate_" + priceRangeName);
         cell = row.createCell(6);
-        cell.setCellValue("Ad publish date");
+        cell.setCellValue("AdPublishDate_" + priceRangeName);
         cell = row.createCell(7);
-        cell.setCellValue("Last inspection date");
+        cell.setCellValue("LastInspectionDate_" + priceRangeName);
         cell = row.createCell(8);
-        cell.setCellValue("Product list");
+        cell.setCellValue("NumberProducts_" + priceRangeName);
         cell = row.createCell(9);
-        cell.setCellValue("Postal code");
+        cell.setCellValue("ProductsCostSum_" + priceRangeName);
+        cell = row.createCell(10);
+        cell.setCellValue("PostalCode_" + priceRangeName);
+        cell = row.createCell(11);
+        cell.setCellValue("OrgID_" + priceRangeName);
+        cell = row.createCell(12);
+        cell.setCellValue("SourceName_" + priceRangeName);
         for(ExtendedAd res : aggRes){
             row = sheet.createRow(rownum++);
             int cellnum = 0;
@@ -183,8 +194,15 @@ public static void main( String[] args ) throws ParseException{
             cell.setCellValue(res.getLastInspection());
             cell.setCellStyle(cellStyle);
             cell = row.createCell(cellnum++);
+            cell.setCellValue(ListUtils.getListSize(res.getProductList()));
+            cell = row.createCell(cellnum++);
+            cell.setCellValue(ListUtils.getProductsPrice(res.getProductList()));
             cell = row.createCell(cellnum++);
             cell.setCellValue(res.getPostalCode());
+            cell = row.createCell(cellnum++);
+            cell.setCellValue(res.getOrgId());
+            cell = row.createCell(cellnum++);
+            cell.setCellValue(ListUtils.getSourceName(res.getSource()));
         	
         }
          
@@ -201,4 +219,6 @@ public static void main( String[] args ) throws ParseException{
             e.printStackTrace();
         } 
     }
+    
+    
 }

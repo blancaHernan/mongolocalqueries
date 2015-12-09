@@ -38,6 +38,8 @@ public class UserAnalyzer {
     	StopWatch stopwatch = new StopWatch();
     	stopwatch.start();
     	boolean search = true;
+    	//Last input 
+    	//	52923 elements in User-19970006-19975006
     	long minOrgId = 19560006;
     	long maxOrgId = 19565006;        
     	//Write the results in a excel list

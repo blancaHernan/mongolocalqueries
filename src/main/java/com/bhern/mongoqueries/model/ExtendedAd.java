@@ -12,6 +12,7 @@ import java.util.List;
 
 public class ExtendedAd {
 	private long adId;
+	private long orgId;
 	private String source;
 	private int imagesCount;
 	private int textLenght;
@@ -66,10 +67,16 @@ public class ExtendedAd {
 	public String getPostalCode() {
 		return postalCode;
 	}
+	
 
-	public ExtendedAd(long adId, String source, int imagesCount, int textLenght, double price, Date adCreated,
+	public long getOrgId() {
+		return orgId;
+	}
+
+	public ExtendedAd(long orgId, long adId, String source, int imagesCount, int textLenght, double price, Date adCreated,
 			Date adPublish, Date lastInspection, List<Product> productList, MainCategory mainCategory, String postalCode) {
 		super();
+		this.orgId = orgId;
 		this.adId = adId;
 		this.source = source;
 		this.imagesCount = imagesCount;
