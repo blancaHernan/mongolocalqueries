@@ -22,6 +22,8 @@ import org.apache.poi.ss.usermodel.Cell;
 import org.apache.poi.ss.usermodel.CellStyle;
 import org.apache.poi.ss.usermodel.CreationHelper;
 import org.apache.poi.ss.usermodel.Row;
+import org.apache.poi.ss.usermodel.Sheet;
+import org.apache.poi.xssf.streaming.SXSSFWorkbook;
 import org.springframework.context.ApplicationContext;
 import org.springframework.context.support.GenericXmlApplicationContext;
 import org.springframework.data.domain.Sort.Direction;
@@ -50,8 +52,11 @@ public static void main( String[] args ) throws ParseException{
     	stopwatch.start();
     	List<MainCategory> categories = DataInitializer.init();   	   
 	   	System.out.print("Loaded!!");
-	   	for(MainCategory cat : categories){	   		
-	        HSSFWorkbook workbook = new HSSFWorkbook();
+	   	for(MainCategory cat : categories){	  
+	   		SXSSFWorkbook workbook = new SXSSFWorkbook();
+			Sheet sheet = workbook.createSheet("extended_ad");
+			writeFirstRow(sheet);
+	   		int rownum = 1;
 	   		for(PriceRange price : cat.getPriceRange()){
 				   	Criteria criteria = getCriteria(cat.getValueId(), price.getMinPrice(), price.getMaxPrice());
 				   	Aggregation sourceAggregation = getAggregation(criteria);	   	  
@@ -59,8 +64,9 @@ public static void main( String[] args ) throws ParseException{
 				   	AggregationResults<DBObject> aggregateResults = mongoOperation.aggregate(sourceAggregation, "extendedAd", DBObject.class);
 				   	
 				   	List<ExtendedAd> aggRes = mapResults(aggregateResults.getMappedResults());
-				   	writeExcel(aggRes, cat.getName(), price, workbook );
+				   	rownum = writeExcel(aggRes, cat.getName(), price, workbook, sheet, rownum);
 	   		}
+	        writeWorkBook(cat.getName(), workbook); 
 	   	}
 	   	stopwatch.stop();
 	   	System.out.println("Duration: " + stopwatch.getLastTaskTimeMillis());
@@ -133,48 +139,19 @@ public static void main( String[] args ) throws ParseException{
         return aggRes;
     }
     
-    private static void writeExcel(List<ExtendedAd> aggRes, String sheetName, PriceRange price, HSSFWorkbook workbook){
+    private static int writeExcel(List<ExtendedAd> aggRes, String sheetName, PriceRange price, 
+    		SXSSFWorkbook workbook, Sheet sheet, int rownum){
         //Write the results in a excel list
-        String priceRangeName = price.getMinPrice() + " - " + price.getMaxPrice();
-		HSSFSheet sheet = workbook.createSheet(priceRangeName);
-        CreationHelper createHelper = workbook.getCreationHelper();
-        
+        CreationHelper createHelper = workbook.getCreationHelper();      
 
-        int rownum = 0;
         CellStyle cellStyle = workbook.createCellStyle();
         cellStyle.setDataFormat(
                 createHelper.createDataFormat().getFormat("yyyy-MM-dd'T'HH:mm:ss.SSSz")); 
-        Row row = sheet.createRow(rownum++);
-        Cell cell = row.createCell(0);
-        cell.setCellValue("AdId_" + priceRangeName);
-        cell = row.createCell(1);
-        cell.setCellValue("Source_" + priceRangeName);
-        cell = row.createCell(2);
-        cell.setCellValue("NumberImages_" + priceRangeName);
-        cell = row.createCell(3);
-        cell.setCellValue("TextLength_" + priceRangeName);
-        cell = row.createCell(4);
-        cell.setCellValue("Price_" + priceRangeName);
-        cell = row.createCell(5);
-        cell.setCellValue("AdCreatedDate_" + priceRangeName);
-        cell = row.createCell(6);
-        cell.setCellValue("AdPublishDate_" + priceRangeName);
-        cell = row.createCell(7);
-        cell.setCellValue("LastInspectionDate_" + priceRangeName);
-        cell = row.createCell(8);
-        cell.setCellValue("NumberProducts_" + priceRangeName);
-        cell = row.createCell(9);
-        cell.setCellValue("ProductsCostSum_" + priceRangeName);
-        cell = row.createCell(10);
-        cell.setCellValue("PostalCode_" + priceRangeName);
-        cell = row.createCell(11);
-        cell.setCellValue("OrgID_" + priceRangeName);
-        cell = row.createCell(12);
-        cell.setCellValue("SourceName_" + priceRangeName);
+        
         for(ExtendedAd res : aggRes){
-            row = sheet.createRow(rownum++);
+            Row row = sheet.createRow(rownum++);
             int cellnum = 0;
-            cell = row.createCell(cellnum++);
+            Cell cell = row.createCell(cellnum++);
             cell.setCellValue(res.getAdId());
             cell = row.createCell(cellnum++);
             cell.setCellValue(res.getSource());
@@ -205,8 +182,41 @@ public static void main( String[] args ) throws ParseException{
             cell.setCellValue(ListUtils.getSourceName(res.getSource()));
         	
         }
-         
-        try {
+        return rownum; 
+    }
+    
+    private static void writeFirstRow(Sheet sheet){
+    	Row row = sheet.createRow(0);
+        Cell cell = row.createCell(0);
+        cell.setCellValue("AdId_" );
+        cell = row.createCell(1);
+        cell.setCellValue("Source_" );
+        cell = row.createCell(2);
+        cell.setCellValue("NumberImages_" );
+        cell = row.createCell(3);
+        cell.setCellValue("TextLength_" );
+        cell = row.createCell(4);
+        cell.setCellValue("Price_" );
+        cell = row.createCell(5);
+        cell.setCellValue("AdCreatedDate_" );
+        cell = row.createCell(6);
+        cell.setCellValue("AdPublishDate_" );
+        cell = row.createCell(7);
+        cell.setCellValue("LastInspectionDate_" );
+        cell = row.createCell(8);
+        cell.setCellValue("NumberProducts_" );
+        cell = row.createCell(9);
+        cell.setCellValue("ProductsCostSum_" );
+        cell = row.createCell(10);
+        cell.setCellValue("PostalCode_" );
+        cell = row.createCell(11);
+        cell.setCellValue("OrgID_" );
+        cell = row.createCell(12);
+        cell.setCellValue("SourceName_" );
+    }
+
+	private static void writeWorkBook(String sheetName, SXSSFWorkbook workbook) {
+		try {
             FileOutputStream out = 
                     new FileOutputStream(new File("C:\\Users\\blancaHN\\Desktop\\WI\\Master arbeit\\excels\\" + sheetName + ".xls"));
             workbook.write(out);
@@ -217,8 +227,8 @@ public static void main( String[] args ) throws ParseException{
             e.printStackTrace();
         } catch (IOException e) {
             e.printStackTrace();
-        } 
-    }
+        }
+	}
     
     
 }
